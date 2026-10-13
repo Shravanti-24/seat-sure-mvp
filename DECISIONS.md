@@ -283,3 +283,24 @@ obvious next step if the event list ever grew.
 **Why:** `html5-qrcode` is about 340 kB of the bundle and only staff ever open the scanner. Splitting
 it keeps the attendee bundle — the one that has to load on a phone the moment a drop starts — at
 roughly 239 kB (75 kB gzipped).
+
+## 26. The load test measures the drop, not the login
+
+**Chose:** k6's `setup()` signs all 500 users in before the clock starts; the measured iteration is
+hold-then-pay only.
+**Alternative:** log in inside the iteration, which is what the first version did.
+**Why:** that first run reported a p95 of 14.7 s, and the cause was 500 simultaneous BCrypt
+verifications on four cores, not the booking path. BCrypt is deliberately expensive, so a thundering
+herd of logins is a CPU wall that says nothing about seat contention. Moving logins out — which is
+also more faithful, since real attendees are already signed in when a drop opens — took p95 from
+14.7 s to 2.0 s on the same hardware. The numbers are in `loadtest/RESULTS.md`, including the first
+run, because the mistake is the more interesting half of the story.
+
+## 27. The load-test event is a normal sale
+
+**Chose:** the seeded `Load Test Drop (50 seats)` event has `high_demand = false`, so k6 goes
+straight at the hold endpoint.
+**Alternative:** route the 500 users through the waiting room first.
+**Why:** the question this test answers is "can the booking path sell a seat twice under contention?"
+A queue in front of it would throttle arrivals to 25 every 5 seconds, which is exactly the contention
+the test is trying to create. The waiting room is covered by `FullFlowIntegrationTest` instead.
