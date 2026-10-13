@@ -92,7 +92,7 @@ public class BookingConfirmationService {
         List<Long> eventSeatIds = bookingSeats.stream()
                 .map(bookingSeat -> bookingSeat.getEventSeat().getId())
                 .toList();
-        List<EventSeat> eventSeats = eventSeatRepository.findAllByIdForUpdate(eventSeatIds);
+        List<EventSeat> eventSeats = eventSeatRepository.findAllForConfirmation(eventSeatIds);
 
         for (EventSeat eventSeat : eventSeats) {
             if (eventSeat.getStatus() != EventSeatStatus.AVAILABLE) {

@@ -21,6 +21,8 @@
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <zxing.version>3.5.3</zxing.version>
+        <!-- Newer than the Spring Boot BOM default: needed to talk to Docker API 1.40+. -->
+        <testcontainers.version>1.21.3</testcontainers.version>
     </properties>
 
     <dependencies>

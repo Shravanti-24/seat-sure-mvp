@@ -216,3 +216,28 @@ were already freed by the Redis TTL.
 becomes a correctness bug. Here a late job only means a booking row says `PENDING_PAYMENT` for a
 while longer; no seat is withheld from sale. The job matters for the seat limit (an expired booking
 must stop counting), which is a fairness question, not a double-booking one.
+
+## 20. `OPTIMISTIC`, not `OPTIMISTIC_FORCE_INCREMENT`
+
+**Chose:** the confirmation reads each `event_seat` with `@Lock(LockModeType.OPTIMISTIC)` and then
+writes it.
+**Alternative:** `OPTIMISTIC_FORCE_INCREMENT`, which I tried first.
+**Why:** force-increment schedules a version bump of its own *in addition to* the entity's own
+update. Because the confirmation always modifies the row, the two writes collided and
+`DoubleBookingGuardsTest` showed *both* competing transactions failing instead of one. Plain
+`OPTIMISTIC` is the right tool when the row is going to be modified anyway: the version read is
+checked by the update's `WHERE` clause, so exactly one writer wins. Force-increment is for the case
+where you need a version bump on a row you only *read* — not this one.
+
+## 21. Integration tests on real Postgres and Redis
+
+**Chose:** Testcontainers starts `postgres:16-alpine` and `redis:7-alpine`, shared statically across
+test classes. If `SEATSURE_TEST_DATASOURCE_URL` and `SEATSURE_TEST_REDIS_URL` are set, those servers
+are used instead and the public schema is dropped first so Flyway replays from scratch.
+**Alternative:** H2 with an embedded Redis mock.
+**Why:** nearly everything worth testing here is database- and Redis-specific — a partial unique
+index, `@Version` behaviour on a real `UPDATE ... WHERE version = ?`, Lua script atomicity, key TTLs.
+On H2 those tests would pass while proving nothing about production. The environment override exists
+because Docker 29 raised its minimum API version above what the Testcontainers client negotiates, so
+on such a machine the suite can still run against a local Postgres and Redis instead of being
+skipped.

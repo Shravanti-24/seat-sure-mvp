@@ -22,12 +22,13 @@ public interface EventSeatRepository extends JpaRepository<EventSeat, Long> {
     List<EventSeat> findByEventIdAndSeatIds(Long eventId, Collection<Long> seatIds);
 
     /**
-     * Read with optimistic locking forced, so the version is checked on write even if nothing on the
-     * row changed. This is the read used by the payment confirmation.
+     * The read used by the payment confirmation. {@code OPTIMISTIC} states the intent explicitly:
+     * these rows are about to be written, and the version read here must still be the version in the
+     * database when the write lands, or the transaction loses the race and rolls back.
      */
-    @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+    @Lock(LockModeType.OPTIMISTIC)
     @Query("select es from EventSeat es where es.id in :ids")
-    List<EventSeat> findAllByIdForUpdate(Collection<Long> ids);
+    List<EventSeat> findAllForConfirmation(Collection<Long> ids);
 
     long countByEventIdAndStatus(Long eventId, EventSeatStatus status);
 
