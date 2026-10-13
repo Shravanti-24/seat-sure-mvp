@@ -241,3 +241,45 @@ On H2 those tests would pass while proving nothing about production. The environ
 because Docker 29 raised its minimum API version above what the Testcontainers client negotiates, so
 on such a machine the suite can still run against a local Postgres and Redis instead of being
 skipped.
+
+## 22. The JWT lives in memory, mirrored into localStorage
+
+**Chose:** the token is held in a module-level variable in `src/api/client.ts` and written to
+`localStorage` only so a page reload can restore the session, which then calls `/api/auth/me` to
+rebuild the user.
+**Alternative:** an httpOnly cookie, or memory only with no persistence.
+**Why, and the trade-off I would say out loud:** anything readable by JavaScript is readable by an
+XSS payload, so this storage is not XSS-proof — an httpOnly, SameSite cookie would be, because the
+script could never read the token. I did not use one because the API is stateless and cross-origin
+(Vercel frontend, Render backend), which makes cookies mean CSRF protection and a shared parent
+domain. Memory only would be safest, but then every refresh signs the user out, which during a drop
+is worse than the risk it removes. The mitigation is that React escapes interpolated content by
+default and the app never uses `dangerouslySetInnerHTML`.
+
+## 23. Admission tokens in sessionStorage, seat picks in component state
+
+**Chose:** the admission token the waiting room hands out is kept in `sessionStorage`, scoped per
+event; the user's selected seats are plain React state.
+**Alternative:** keeping the token in memory only.
+**Why:** the token has to survive the navigation from the queue page to the seat map and any reload
+on the way, or an admitted user would be bounced back into the queue by their own browser. It is
+only a convenience copy: the server holds the authoritative key with a ten-minute TTL, so a stale
+copy in the tab buys nothing.
+
+## 24. Polling, not WebSockets, for the seat map and the queue
+
+**Chose:** TanStack Query with `refetchInterval` — 3 seconds for the seat map and the queue, 5 for
+the events list and the organiser report.
+**Alternative:** a WebSocket or SSE stream pushing seat changes.
+**Why:** polling is stateless, so the API can scale horizontally without sticky sessions, and the
+queue poll doubles as the heartbeat that detects abandonment. Three seconds is fast enough that a
+seat turning amber feels live, and the rate limiter is configured well above that interval so an
+honest client is never throttled. A push channel would be lighter per user at large scale and is the
+obvious next step if the event list ever grew.
+
+## 25. The gate scanner is code-split
+
+**Chose:** `GateScannerPage` is loaded with `React.lazy`.
+**Why:** `html5-qrcode` is about 340 kB of the bundle and only staff ever open the scanner. Splitting
+it keeps the attendee bundle — the one that has to load on a phone the moment a drop starts — at
+roughly 239 kB (75 kB gzipped).
