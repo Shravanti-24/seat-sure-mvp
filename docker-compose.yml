@@ -1,0 +1,55 @@
+# docker compose up --build  ->  Postgres, Redis and the API, with the demo data already seeded.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-seatsure}
+      POSTGRES_USER: ${POSTGRES_USER:-seatsure}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seatsure}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seatsure} -d ${POSTGRES_DB:-seatsure}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-seatsure}
+      DATABASE_USERNAME: ${POSTGRES_USER:-seatsure}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-seatsure}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me-32-bytes-min}
+      TICKET_HMAC_SECRET: ${TICKET_HMAC_SECRET:-dev-only-ticket-hmac-secret-change-me}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin12345}
+      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-gate12345}
+      SEED_LOADTEST_PASSWORD: ${SEED_LOADTEST_PASSWORD:-loadtest12345}
+      HIGH_DEMAND_SALE_DELAY_MINUTES: ${HIGH_DEMAND_SALE_DELAY_MINUTES:-2}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:

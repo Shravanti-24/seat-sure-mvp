@@ -1,0 +1,12 @@
+# 500 seeded attendees and a 50-seat event. Rate limiting stays on, because surviving it is part of
+# what the load test proves; the k6 script treats a 429 as an expected outcome, not an error.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/loadtest
+
+seatsure:
+  rate-limit:
+    limits:
+      holds: 30
+      payments: 30
+      queue-status: 60
